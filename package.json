@@ -1,0 +1,16 @@
+{
+  "name": "wordpress-sqe-project",
+  "version": "1.0.0",
+  "description": "WordPress CI/CD Quality Engineering Project",
+  "scripts": {
+    "test": "cypress run",
+    "test:open": "cypress open",
+    "test:headless": "cypress run --headless"
+  },
+  "devDependencies": {
+    "cypress": "^13.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
+
