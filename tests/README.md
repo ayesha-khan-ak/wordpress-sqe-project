@@ -40,16 +40,23 @@ Edit `phpunit.xml` to configure your test database:
 
 ### WordPress Setup
 
-For tests to work properly, you need WordPress available. Options:
+**WordPress is cloned and ready!** ✅
+
+**Location:** `wordpress/` directory in project root
+
+The tests are configured to automatically load WordPress from the cloned directory.
 
 1. **Docker Setup** (Recommended):
    ```bash
    docker-compose up -d
    ```
    WordPress will be available at http://localhost:8082
+   The cloned WordPress directory is mounted in the container.
 
-2. **wp-phpunit** (Alternative):
-   The `wp-phpunit` package is included in `composer.json`. It provides WordPress test framework.
+2. **Test Configuration:**
+   - `tests/bootstrap.php` loads WordPress from `wordpress/wp-load.php`
+   - All WordPress functions are available for testing
+   - Database configuration is in `phpunit.xml`
 
 ## Running Tests
 

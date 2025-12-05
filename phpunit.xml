@@ -25,9 +25,12 @@
     
     <coverage>
         <include>
+            <directory suffix=".php">./wordpress</directory>
             <directory suffix=".php">./wp-content</directory>
         </include>
         <exclude>
+            <directory>./wordpress/wp-content</directory>
+            <directory>./wordpress/wp-admin/includes</directory>
             <directory>./wp-content/themes</directory>
             <directory>./wp-content/plugins/akismet</directory>
             <directory>./vendor</directory>
@@ -36,11 +39,20 @@
     </coverage>
     
     <php>
+        <!-- WordPress Path Configuration -->
+        <env name="WORDPRESS_PATH" value="./wordpress"/>
+        <env name="ABSPATH" value="./wordpress/"/>
+        
+        <!-- Database Configuration for Tests -->
         <env name="WP_TESTS_DB_NAME" value="wordpress_test"/>
         <env name="WP_TESTS_DB_USER" value="wordpress"/>
         <env name="WP_TESTS_DB_PASSWORD" value="wordpress"/>
         <env name="WP_TESTS_DB_HOST" value="localhost"/>
         <env name="WP_TESTS_TABLE_PREFIX" value="wp_test_"/>
+        
+        <!-- WordPress Configuration -->
+        <env name="WP_USE_THEMES" value="false"/>
+        <env name="WP_DEBUG" value="true"/>
     </php>
     
 </phpunit>

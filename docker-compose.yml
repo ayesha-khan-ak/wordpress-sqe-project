@@ -16,6 +16,7 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
+      - ./wordpress:/var/www/html/wordpress-core:ro  # Mount cloned WordPress as read-only
     depends_on:
       - db
     networks:
