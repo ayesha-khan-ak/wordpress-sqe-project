@@ -25,16 +25,33 @@
     
     <coverage>
         <include>
-            <directory suffix=".php">./wordpress</directory>
-            <directory suffix=".php">./wp-content</directory>
+            <!-- Custom project code that we actually test -->
+            <directory suffix=".php">./wp-content/mu-plugins</directory>
+            <!-- WordPress core files that our tests exercise -->
+            <directory suffix=".php">../wp-includes</directory>
+            <directory suffix=".php">../wp-admin</directory>
         </include>
         <exclude>
-            <directory>./wordpress/wp-content</directory>
-            <directory>./wordpress/wp-admin/includes</directory>
-            <directory>./wp-content/themes</directory>
-            <directory>./wp-content/plugins/akismet</directory>
+            <!-- Exclude WordPress core directories that are not testable -->
+            <directory>../wp-content/themes</directory>
+            <directory>../wp-content/plugins</directory>
+            <directory>../wp-content/upgrade</directory>
+            <directory>../wp-content/uploads</directory>
+            <directory>../wp-admin/includes</directory>
+            <directory>../wp-includes/SimplePie</directory>
+            <directory>../wp-includes/IXR</directory>
+            <directory>../wp-includes/Text</directory>
+            <directory>../wp-includes/Requests</directory>
+            <directory>../wp-includes/ID3</directory>
+            <directory>../wp-includes/PHPMailer</directory>
+            <directory>../wp-includes/random_compat</directory>
+            <directory>../wp-includes/blocks</directory>
+            <directory>../wp-includes/js</directory>
+            <directory>../wp-includes/css</directory>
+            <!-- Exclude project directories -->
             <directory>./vendor</directory>
             <directory>./tests</directory>
+            <directory>./build</directory>
         </exclude>
     </coverage>
     
@@ -44,10 +61,10 @@
         <env name="ABSPATH" value="./wordpress/"/>
         
         <!-- Database Configuration for Tests -->
-        <env name="WP_TESTS_DB_NAME" value="wordpress_test"/>
+        <env name="WP_TESTS_DB_NAME" value="wordpress"/>
         <env name="WP_TESTS_DB_USER" value="wordpress"/>
         <env name="WP_TESTS_DB_PASSWORD" value="wordpress"/>
-        <env name="WP_TESTS_DB_HOST" value="localhost"/>
+        <env name="WP_TESTS_DB_HOST" value="db"/>
         <env name="WP_TESTS_TABLE_PREFIX" value="wp_test_"/>
         
         <!-- WordPress Configuration -->

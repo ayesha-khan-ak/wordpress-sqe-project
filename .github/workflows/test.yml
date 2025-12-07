@@ -1,0 +1,191 @@
+name: CI/CD Pipeline - Test Stage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  backend-tests:
+    name: Backend Tests (PHPUnit)
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+          MYSQL_USER: wordpress
+          MYSQL_PASSWORD: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.0'
+        extensions: mbstring, xml, curl, zip, gd, mysql, mysqli, pdo, pdo_mysql
+        coverage: xdebug
+        tools: composer
+        
+    - name: Validate composer.json
+      run: composer validate --strict || composer validate
+      continue-on-error: true
+      
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress --no-interaction
+      
+    - name: Wait for MySQL to be ready
+      run: |
+        while ! mysqladmin ping -h"127.0.0.1" -P"3306" -u"wordpress" -p"wordpress" --silent; do
+          echo "Waiting for MySQL..."
+          sleep 2
+        done
+        echo "MySQL is ready!"
+      env:
+        MYSQL_PWD: wordpress
+        
+    - name: Create WordPress test database
+      run: |
+        mysql -h 127.0.0.1 -P 3306 -u wordpress -pwordpress -e "CREATE DATABASE IF NOT EXISTS wordpress_test;"
+        mysql -h 127.0.0.1 -P 3306 -u wordpress -pwordpress -e "GRANT ALL PRIVILEGES ON wordpress_test.* TO 'wordpress'@'%';"
+        mysql -h 127.0.0.1 -P 3306 -u wordpress -pwordpress -e "FLUSH PRIVILEGES;"
+      env:
+        MYSQL_PWD: wordpress
+        
+    - name: Download WordPress
+      run: |
+        if [ ! -d "wordpress" ] || [ ! -f "wordpress/wp-load.php" ]; then
+          echo "Downloading WordPress..."
+          curl -L -o wordpress.tar.gz https://wordpress.org/latest.tar.gz
+          tar -xzf wordpress.tar.gz
+          rm wordpress.tar.gz
+          echo "WordPress downloaded successfully"
+        else
+          echo "WordPress directory already exists"
+        fi
+      continue-on-error: false
+      
+    - name: Set up WordPress test configuration
+      run: |
+        cat > wp-tests-config.php << 'EOF'
+        <?php
+        define('DB_NAME', 'wordpress_test');
+        define('DB_USER', 'wordpress');
+        define('DB_PASSWORD', 'wordpress');
+        define('DB_HOST', '127.0.0.1:3306');
+        define('DB_CHARSET', 'utf8');
+        define('DB_COLLATE', '');
+        define('WP_TESTS_DOMAIN', 'localhost');
+        define('WP_TESTS_EMAIL', 'admin@example.org');
+        define('WP_TESTS_TITLE', 'Test');
+        define('WP_PHP_BINARY', 'php');
+        define('WP_TESTS_FORCE_KNOWN_BUGS', true);
+        define('WP_TESTS_TABLE_PREFIX', 'wp_test_');
+        EOF
+        echo "WordPress test configuration created"
+        
+    - name: Create test results directory
+      run: mkdir -p tests/results
+      
+    - name: Run PHPUnit Tests
+      run: |
+        ./vendor/bin/phpunit \
+          --configuration phpunit.xml \
+          --log-junit tests/results/junit.xml \
+          --coverage-clover tests/results/coverage.xml \
+          --coverage-html tests/results/coverage-html \
+          --testdox \
+          --verbose
+      env:
+        WP_TESTS_DB_NAME: wordpress_test
+        WP_TESTS_DB_USER: wordpress
+        WP_TESTS_DB_PASSWORD: wordpress
+        WP_TESTS_DB_HOST: 127.0.0.1:3306
+        WP_TESTS_TABLE_PREFIX: wp_test_
+        WORDPRESS_PATH: ./wordpress
+        ABSPATH: ./wordpress/
+        WP_USE_THEMES: false
+        WP_DEBUG: true
+        DB_NAME: wordpress_test
+        DB_USER: wordpress
+        DB_PASSWORD: wordpress
+        DB_HOST: 127.0.0.1:3306
+      continue-on-error: false
+      
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "## Backend Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f "tests/results/junit.xml" ]; then
+          echo "Test results generated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- JUnit XML: tests/results/junit.xml" >> $GITHUB_STEP_SUMMARY
+        fi
+        if [ -f "tests/results/coverage.xml" ]; then
+          echo "- Coverage XML: tests/results/coverage.xml" >> $GITHUB_STEP_SUMMARY
+        fi
+        if [ -d "tests/results/coverage-html" ]; then
+          echo "- Coverage HTML: tests/results/coverage-html/" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Upload test results (JUnit XML)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-junit
+        path: tests/results/junit.xml
+        retention-days: 30
+        if-no-files-found: warn
+        
+    - name: Upload coverage reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-coverage-reports
+        path: |
+          tests/results/coverage.xml
+          tests/results/coverage-html/
+        retention-days: 30
+        if-no-files-found: warn
+        
+    - name: Publish test results
+      if: always()
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        files: tests/results/junit.xml
+        check_name: Backend Test Results
+        report_individual_runs: true
+        deduplicate_classes_by_file_name: true
+        fail_on: 'test failures'
+        
+    - name: Test summary
+      if: always()
+      run: |
+        echo "=========================================="
+        echo "Backend Test Stage Completed"
+        echo "=========================================="
+        if [ -f "tests/results/junit.xml" ]; then
+          echo "Test results: Available"
+        else
+          echo "Test results: Not generated"
+        fi
+        if [ -d "tests/results/coverage-html" ]; then
+          echo "Coverage reports: Available"
+        else
+          echo "Coverage reports: Not generated"
+        fi
+        echo "=========================================="
+

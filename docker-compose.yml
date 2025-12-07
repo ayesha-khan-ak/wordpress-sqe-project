@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   wordpress:
-    image: wordpress:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.xdebug
     container_name: wordpress-sqe
     restart: unless-stopped
     ports:
@@ -17,6 +19,7 @@ services:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
       - ./wordpress:/var/www/html/wordpress-core:ro  # Mount cloned WordPress as read-only
+      - .:/var/www/html/project  # Mount project root for tests
     depends_on:
       - db
     networks:
