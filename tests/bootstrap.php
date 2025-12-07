@@ -22,20 +22,20 @@ foreach ($vendor_paths as $vendor_path) {
 }
 
 // Define WordPress root path
-// Try installed WordPress first, then fall back to cloned WordPress
-$installed_wp_path = '/var/www/html';
+// Try cloned WordPress first (for CI), then installed WordPress (for Docker)
 $cloned_wp_path = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'wordpress';
+$installed_wp_path = '/var/www/html';
 
 // Check which WordPress to use
-if (file_exists($installed_wp_path . DIRECTORY_SEPARATOR . 'wp-load.php')) {
-    // Use installed WordPress (already configured with database)
-    $wordpress_path = $installed_wp_path;
-} elseif (file_exists($cloned_wp_path . DIRECTORY_SEPARATOR . 'wp-load.php')) {
-    // Use cloned WordPress
+if (file_exists($cloned_wp_path . DIRECTORY_SEPARATOR . 'wp-load.php')) {
+    // Use cloned WordPress (for CI/GitHub Actions)
     $wordpress_path = $cloned_wp_path;
+} elseif (file_exists($installed_wp_path . DIRECTORY_SEPARATOR . 'wp-load.php')) {
+    // Use installed WordPress (for Docker local environment)
+    $wordpress_path = $installed_wp_path;
 } else {
     trigger_error(
-        "WordPress not found at: {$installed_wp_path} or {$cloned_wp_path}\n",
+        "WordPress not found at: {$cloned_wp_path} or {$installed_wp_path}\n",
         E_USER_ERROR
     );
 }
@@ -57,7 +57,8 @@ if (!defined('DB_NAME')) {
     $db_name = getenv('WP_TESTS_DB_NAME') ?: 'wordpress';
     $db_user = getenv('WP_TESTS_DB_USER') ?: 'wordpress';
     $db_password = getenv('WP_TESTS_DB_PASSWORD') ?: 'wordpress';
-    $db_host = getenv('WP_TESTS_DB_HOST') ?: 'db'; // Use 'db' hostname from Docker network
+    // In CI, use 127.0.0.1, in Docker use 'db'
+    $db_host = getenv('WP_TESTS_DB_HOST') ?: (file_exists('/var/www/html/wp-load.php') ? 'db' : '127.0.0.1:3306');
     
     // These constants will be used if wp-config.php doesn't exist
     define('DB_NAME', $db_name);
