@@ -102,10 +102,15 @@ jobs:
         echo "WordPress test configuration created"
         
     - name: Create test results directory
-      run: mkdir -p tests/results
+      run: |
+        mkdir -p tests/results
+        mkdir -p tests/results/coverage-html
+        echo "Test results directory created"
+        ls -la tests/results/
       
     - name: Run PHPUnit Tests
       run: |
+        echo "Starting PHPUnit tests..."
         ./vendor/bin/phpunit \
           --configuration phpunit.xml \
           --log-junit tests/results/junit.xml \
@@ -114,6 +119,21 @@ jobs:
           --testdox \
           --verbose \
           || echo "Tests completed with exit code: $?"
+        
+        echo ""
+        echo "Checking generated files..."
+        echo "JUnit XML exists: $([ -f tests/results/junit.xml ] && echo 'YES' || echo 'NO')"
+        echo "Coverage XML exists: $([ -f tests/results/coverage.xml ] && echo 'YES' || echo 'NO')"
+        echo "Coverage HTML dir exists: $([ -d tests/results/coverage-html ] && echo 'YES' || echo 'NO')"
+        
+        if [ -f tests/results/junit.xml ]; then
+          echo "JUnit XML size: $(wc -l < tests/results/junit.xml) lines"
+        fi
+        
+        if [ -d tests/results/coverage-html ]; then
+          echo "Coverage HTML files: $(find tests/results/coverage-html -type f | wc -l)"
+          ls -la tests/results/coverage-html/ | head -10
+        fi
       env:
         WP_TESTS_DB_NAME: wordpress_test
         WP_TESTS_DB_USER: wordpress
@@ -130,20 +150,55 @@ jobs:
         DB_HOST: 127.0.0.1:3306
       continue-on-error: true
       
+    - name: List generated files
+      if: always()
+      run: |
+        echo "=========================================="
+        echo "Checking for generated test files..."
+        echo "=========================================="
+        echo ""
+        echo "Current directory: $(pwd)"
+        echo ""
+        echo "Tests/results directory contents:"
+        ls -la tests/results/ 2>/dev/null || echo "Directory does not exist"
+        echo ""
+        echo "Checking specific files:"
+        [ -f tests/results/junit.xml ] && echo "✓ junit.xml exists ($(wc -c < tests/results/junit.xml) bytes)" || echo "✗ junit.xml NOT found"
+        [ -f tests/results/coverage.xml ] && echo "✓ coverage.xml exists ($(wc -c < tests/results/coverage.xml) bytes)" || echo "✗ coverage.xml NOT found"
+        [ -d tests/results/coverage-html ] && echo "✓ coverage-html directory exists ($(find tests/results/coverage-html -type f | wc -l) files)" || echo "✗ coverage-html directory NOT found"
+        echo ""
+        if [ -d tests/results/coverage-html ]; then
+          echo "Coverage HTML files:"
+          find tests/results/coverage-html -type f | head -10
+        fi
+        echo "=========================================="
+        
     - name: Generate test summary
       if: always()
       run: |
         echo "## Backend Test Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        
         if [ -f "tests/results/junit.xml" ]; then
-          echo "Test results generated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Test results generated successfully" >> $GITHUB_STEP_SUMMARY
           echo "- JUnit XML: tests/results/junit.xml" >> $GITHUB_STEP_SUMMARY
+          echo "- Size: $(wc -c < tests/results/junit.xml) bytes" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ JUnit XML not found" >> $GITHUB_STEP_SUMMARY
         fi
+        
         if [ -f "tests/results/coverage.xml" ]; then
           echo "- Coverage XML: tests/results/coverage.xml" >> $GITHUB_STEP_SUMMARY
+          echo "- Size: $(wc -c < tests/results/coverage.xml) bytes" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Coverage XML not found" >> $GITHUB_STEP_SUMMARY
         fi
+        
         if [ -d "tests/results/coverage-html" ]; then
           echo "- Coverage HTML: tests/results/coverage-html/" >> $GITHUB_STEP_SUMMARY
+          echo "- Files: $(find tests/results/coverage-html -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Coverage HTML directory not found" >> $GITHUB_STEP_SUMMARY
         fi
         
     - name: Upload test results (JUnit XML)
@@ -154,6 +209,7 @@ jobs:
         path: tests/results/junit.xml
         retention-days: 30
         if-no-files-found: warn
+      continue-on-error: true
         
     - name: Upload coverage reports
       if: always()
@@ -165,6 +221,66 @@ jobs:
           tests/results/coverage-html/
         retention-days: 30
         if-no-files-found: warn
+      continue-on-error: true
+      
+    - name: Create detailed test report
+      if: always()
+      run: |
+        mkdir -p test-artifacts
+        echo "# Backend Test Execution Report" > test-artifacts/README.md
+        echo "" >> test-artifacts/README.md
+        echo "Generated: $(date)" >> test-artifacts/README.md
+        echo "" >> test-artifacts/README.md
+        echo "## Test Results" >> test-artifacts/README.md
+        echo "" >> test-artifacts/README.md
+        
+        if [ -f tests/results/junit.xml ]; then
+          echo "✅ JUnit XML Report: Available" >> test-artifacts/README.md
+          echo "- Location: tests/results/junit.xml" >> test-artifacts/README.md
+          echo "- Size: $(wc -c < tests/results/junit.xml) bytes" >> test-artifacts/README.md
+          echo "- Lines: $(wc -l < tests/results/junit.xml)" >> test-artifacts/README.md
+        else
+          echo "❌ JUnit XML Report: Not generated" >> test-artifacts/README.md
+        fi
+        
+        echo "" >> test-artifacts/README.md
+        echo "## Coverage Reports" >> test-artifacts/README.md
+        echo "" >> test-artifacts/README.md
+        
+        if [ -f tests/results/coverage.xml ]; then
+          echo "✅ Coverage XML: Available" >> test-artifacts/README.md
+          echo "- Location: tests/results/coverage.xml" >> test-artifacts/README.md
+          echo "- Size: $(wc -c < tests/results/coverage.xml) bytes" >> test-artifacts/README.md
+        else
+          echo "❌ Coverage XML: Not generated" >> test-artifacts/README.md
+        fi
+        
+        if [ -d tests/results/coverage-html ]; then
+          echo "✅ Coverage HTML: Available" >> test-artifacts/README.md
+          echo "- Location: tests/results/coverage-html/" >> test-artifacts/README.md
+          echo "- Files: $(find tests/results/coverage-html -type f | wc -l)" >> test-artifacts/README.md
+          echo "- Main file: tests/results/coverage-html/index.html" >> test-artifacts/README.md
+        else
+          echo "❌ Coverage HTML: Not generated" >> test-artifacts/README.md
+        fi
+        
+        echo "" >> test-artifacts/README.md
+        echo "## How to Use" >> test-artifacts/README.md
+        echo "" >> test-artifacts/README.md
+        echo "1. Download artifacts from GitHub Actions" >> test-artifacts/README.md
+        echo "2. Extract the zip files" >> test-artifacts/README.md
+        echo "3. Open coverage-html/index.html in a browser to view coverage" >> test-artifacts/README.md
+        echo "4. Check junit.xml for test results" >> test-artifacts/README.md
+        
+    - name: Upload test artifacts documentation
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-artifacts-docs
+        path: test-artifacts/
+        retention-days: 30
+        if-no-files-found: warn
+      continue-on-error: true
         
     - name: Publish test results
       if: always()
